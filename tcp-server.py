@@ -19,7 +19,6 @@ def main():
 
     Raises:
         Socket error if socket creation failed
-
     """
 
     try:
@@ -31,7 +30,7 @@ def main():
 
         # Step 3: Listen for incoming requests and store in backlog
         tcp_soc_obj.listen(BACKLOG)
-        print("SUCCESS! Server created and listening for requests...")
+        print("SUCCESS! Server created and listening for requests...", "\n")
 
         # Step 4: Prepare requests for processing using select module
         inputs = [tcp_soc_obj]
@@ -42,6 +41,7 @@ def main():
 
             for sock in inready:
                 conn, addr = sock.accept()
+                print('\n', '*** NEW CONNECTION ***********************************', '\n')
                 print('SUCCESS! Server connected to: ', addr, ' at ', current_time())
                 _thread.start_new_thread(handler, (conn, addr))
 
@@ -63,18 +63,18 @@ def handler(conn, addr):
     :param addr: address that is bound to the 'conn' socket object
     :return: calculation for a set of numbers
     """
-
+    counter = 1
     while True:
-        # do some calc
+        # process the thread request
         data = conn.recv(BUFSIZE)
         if not data: break
 
-        print('SUCCESS! Server received: ', data, '\n')
-        print('From: ', addr, '\n')
+        print(counter, ' SUCCESS! Server received: ', data)
+        print('From: ', addr)
 
-        reply = data.upper()
-        print('Sending to Client: ', reply)
-        conn.sendall(reply)
+        print('Sending to Client: ', do_biz_logic(data), '\n')
+        conn.sendall(do_biz_logic(data))
+        counter += 1
         time.sleep(SLEEPYTIME)
 
     conn.close()
@@ -82,6 +82,15 @@ def handler(conn, addr):
 
 def current_time():
     return time.ctime(time.time())
+
+
+def do_biz_logic(data):
+    """
+    Manipulates data and then returns a response
+    :param data: a string of letters
+    :return: a string a of letters
+    """
+    return data.upper()
 
 
 if __name__ == "__main":

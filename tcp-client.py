@@ -20,17 +20,25 @@ def main():
 
     # Step 2: Connect to the TCP server
     tcp_soc_obj.connect((HOST_NAME, HOST_PORT))
-    print('SUCCESS! Connected to host server: ', HOST_NAME)
+    print('\n', '*** WE ARE CONNECTED TO THE TCP SERVER *************************', '\n')
+    print('\n', 'SUCCESS! Connected to host server: ', HOST_NAME, '\n')
 
     # Step 3: Send a message to the TCP server via the socket object
-    message = ['Sup Bitches!', 'Love, Tupac']
-    for line in message:
-        tcp_soc_obj.sendall(str.encode(line))
-        data = tcp_soc_obj.recv(BUFSIZE)
-        print('SUCCESS! Received from server: ', data)
+    send_and_receive(tcp_soc_obj)
 
     # Step 4: Close the socket object
+    print('\n', '*** CLOSING CONNECTION TO SERVER **********************', '\n')
     tcp_soc_obj.close()
+
+
+def send_and_receive(soc_obj):
+    message = ['Sup Bitches!', 'Love, Tupac']
+    counter = 1;
+    for line in message:
+        soc_obj.sendall(str.encode(line))
+        data = soc_obj.recv(BUFSIZE)
+        print(counter, 'SUCCESS! Received from server: ', data, '\n')
+        counter += 1
 
 
 if __name__ == "__main":
