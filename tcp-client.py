@@ -1,4 +1,5 @@
 import socket
+import time
 
 # TCP Client that connects to the local machine's TCP server
 
@@ -7,6 +8,7 @@ BUFSIZE = 16
 HOST_NAME = socket.gethostname()
 HOST_IP = socket.gethostbyname(HOST_NAME)
 HOST_PORT = 8888
+TIMEOUT = 2
 
 
 def main():
@@ -32,13 +34,42 @@ def main():
 
 
 def send_and_receive(soc_obj):
-    message = ['Sup Bitches!', 'Love, Tupac']
-    counter = 1;
-    for line in message:
-        soc_obj.sendall(str.encode(line))
-        data = soc_obj.recv(BUFSIZE)
-        print(counter, 'SUCCESS! Received from server: ', data, '\n')
-        counter += 1
+    message = '243+1261+12/343+12'
+    print('Sending msg: ', message, '\n')
+    soc_obj.sendall(str.encode(message))  # encodes string into a bytes object
+    data = soc_obj.recv(4096)
+    print('SUCCESS! Received from server: ', data, '\n')
+
+
+def recv_data(conn):
+    # conn.setblocking(0)
+    conn.settimeout(5)
+    buf_counter = 1
+    data = bytearray()
+    begin = time.time()
+    while True:
+        if data and time.time() - begin > TIMEOUT:
+            print("we got all the data; time to process it.", '\n')
+            break
+        elif time.time() - begin > TIMEOUT + 2:
+            print("client didn't send shit; get out", '\n')
+            break
+        # with data, break after X seconds
+        # with no data, break after X seconds
+        try:
+            print('Receiving chunk # ', buf_counter)
+            chunk = conn.recv(BUFSIZE)
+            if chunk:
+                data.extend(chunk)
+                print('Received chunk #', buf_counter, ': ', chunk, '\n')
+                print('extended msg is now: ', data, '\n')
+                buf_counter += 1
+                begin = time.time()
+            else:
+                time.sleep(5)
+        except (socket.timeout, socket.error, Exception) as e:
+            print(str(e))
+            return data
 
 
 if __name__ == "__main":

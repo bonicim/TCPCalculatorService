@@ -12,6 +12,7 @@ HOST_IP = socket.gethostbyname(HOST_NAME)
 HOST_PORT = 8888
 BACKLOG = 10
 SLEEPYTIME = 10
+TIMEOUT = 2
 
 def main():
     """
@@ -63,21 +64,46 @@ def handler(conn, addr):
     :param addr: address that is bound to the 'conn' socket object
     :return: calculation for a set of numbers
     """
-    counter = 1
     while True:
-        # process the thread request
-        data = conn.recv(BUFSIZE)
-        if not data: break
-
-        print(counter, ' SUCCESS! Server received: ', data)
+        data = recv_data(conn)
+        print(' SUCCESS! Server received: ', data)
         print('From: ', addr)
 
         print('Sending to Client: ', do_biz_logic(data), '\n')
         conn.sendall(do_biz_logic(data))
-        counter += 1
         time.sleep(SLEEPYTIME)
+        conn.close()
 
-    conn.close()
+
+def recv_data(conn):
+    # conn.setblocking(0)
+    conn.settimeout(5)
+    buf_counter = 1
+    data = bytearray()
+    begin = time.time()
+    while True:
+        if data and time.time() - begin > TIMEOUT:
+            print("we got all the data; time to process it.", '\n')
+            break
+        elif time.time() - begin > TIMEOUT + 2:
+            print("client didn't send shit; get out", '\n')
+            break
+        # with data, break after X seconds
+        # with no data, break after X seconds
+        try:
+            print('Receiving chunk # ', buf_counter)
+            chunk = conn.recv(BUFSIZE)
+            if chunk:
+                data.extend(chunk)
+                print('Received chunk #', buf_counter, ': ', chunk, '\n')
+                print('extended msg is now: ', data, '\n')
+                buf_counter += 1
+                begin = time.time()
+            else:
+                time.sleep(5)
+        except (socket.timeout, socket.error, Exception) as e:
+            print(str(e))
+            return data
 
 
 def current_time():
@@ -90,7 +116,14 @@ def do_biz_logic(data):
     :param data: a string of letters
     :return: a string a of letters
     """
-    return data.upper()
+    return data
+
+    # Step 1: declare and initialize the response in the same form as the request
+    # first two bytes=number of answers; second two bytes=length of answer;next X bytes is the string rep of the answer
+
+    # Step 2: Get the first two bytes and determine number of expressions to evaluate
+
+    # Step 3: Establish a location marker of current pos in the byte struct
 
 
 if __name__ == "__main":
