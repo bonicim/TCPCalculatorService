@@ -2,6 +2,7 @@ import socket
 import _thread
 import time
 import select
+import struct
 
 # Multithreaded TCP server that performs simple calculation
 
@@ -16,7 +17,8 @@ TIMEOUT = 2
 
 def main():
     """
-    Creates and starts the TCP server
+    Creates client sockets. As the server socket, its only job is to create client sockets.
+    The server socket does not receive and send data. That is the job of the thread handler.
 
     Raises:
         Socket error if socket creation failed
@@ -24,106 +26,136 @@ def main():
 
     try:
         # Step 1: Create TCP socket object
-        tcp_soc_obj = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
         # Step 2: Bind socket to IP and Port
-        tcp_soc_obj.bind((HOST_IP, HOST_PORT))
+        server_socket.bind((HOST_IP, HOST_PORT))
 
         # Step 3: Listen for incoming requests and store in backlog
-        tcp_soc_obj.listen(BACKLOG)
+        server_socket.listen(BACKLOG)
         print("SUCCESS! Server created and listening for requests...", "\n")
 
         # Step 4: Prepare requests for processing using select module
-        inputs = [tcp_soc_obj]
+        inputs = [server_socket]
 
         # Step 5: Process each request
         while True:
-            inready, outready, excready = select.select(inputs, [], [])
+            read_sockets, write_sockets, err_sockets = select.select(inputs, [], [])
 
-            for sock in inready:
-                conn, addr = sock.accept()
-                print('\n', '*** NEW CONNECTION ***********************************', '\n')
-                print('SUCCESS! Server connected to: ', addr, ' at ', current_time())
-                _thread.start_new_thread(handler, (conn, addr))
+            print('Connection List: ', read_sockets, '\n')
+            for sock in read_sockets:
+                if sock == server_socket:
+                    client_socket, addr = sock.accept() # Creates CLIENT sockets
+                    read_sockets.append(client_socket)
+                    print('\n', '*** NEW CONNECTION ***********************************', '\n')
+                    print('SUCCESS! Server connected to: ', addr, ' at ', current_time())
+                else:
+                    _thread.start_new_thread(handler, (sock,))
 
-        tcp_soc_obj.close()
+        server_socket.close()
 
     except IOError as err:
         print("I/O error: {0}".format(err))
     except ValueError:
         print("Could not convert data to an integer.")
-    else:
-        print('SUCCESS! Server created and running.')
 
 
-def handler(conn, addr):
+def handler(client_socket):
     """
     Processes a socket connection; performs simple calculations and returns results
-
-    :param conn: socket object
-    :param addr: address that is bound to the 'conn' socket object
+    Does not wait for another request
+    
+    :param client_socket: socket object
     :return: calculation for a set of numbers
     """
-    while True:
-        data = recv_data(conn)
-        print(' SUCCESS! Server received: ', data)
-        print('From: ', addr)
+    # Step 1: Receive all the data
+    data = recv_data_v2(client_socket)
+    print('SUCCESS! Server received: ', data)
 
-        print('Sending to Client: ', do_biz_logic(data), '\n')
-        conn.sendall(do_biz_logic(data))
-        time.sleep(SLEEPYTIME)
-        conn.close()
+    # Step 2: Process and send the received data
+    do_biz_logic(data, client_socket)
+
+    # Step 3: Close the client socket
+    time.sleep(SLEEPYTIME)
+    client_socket.close()
 
 
-def recv_data(conn):
-    # conn.setblocking(0)
-    conn.settimeout(5)
+def recv_data_v2(conn):
     buf_counter = 1
-    data = bytearray()
-    begin = time.time()
-    while True:
-        if data and time.time() - begin > TIMEOUT:
-            print("we got all the data; time to process it.", '\n')
-            break
-        elif time.time() - begin > TIMEOUT + 2:
-            print("client didn't send shit; get out", '\n')
-            break
-        # with data, break after X seconds
-        # with no data, break after X seconds
-        try:
-            print('Receiving chunk # ', buf_counter)
-            chunk = conn.recv(BUFSIZE)
-            if chunk:
-                data.extend(chunk)
-                print('Received chunk #', buf_counter, ': ', chunk, '\n')
-                print('extended msg is now: ', data, '\n')
-                buf_counter += 1
-                begin = time.time()
-            else:
-                time.sleep(5)
-        except (socket.timeout, socket.error, Exception) as e:
-            print(str(e))
-            return data
+    total_data = []
+
+    count_total_expr = recv_two_byte_chunk(conn)
+    print('Received very first chunk #', buf_counter, ': ', count_total_expr,'\n')
+    total_data.append(count_total_expr)
+    print('Total data received is: ', total_data, '\n')
+    buf_counter += 1
+
+    len_expr = recv_two_byte_chunk(conn)
+    print('Received length of expr #', buf_counter, ': ', len_expr, '\n')
+    total_data.append(len_expr)
+    print('Total data received is: ', total_data, '\n')
+    buf_counter += 1
+
+    str_expr = recv_len_byte_chunk(conn, len_expr)
+    print('Received string expr ', buf_counter, ': ', str_expr, '\n')
+    total_data.append(str_expr)
+    print('Total data received is: ', total_data, '\n')
+    buf_counter += 1
+
+    return total_data
+
+
+def recv_len_byte_chunk(conn, length):
+    data = ''
+    for x in range(0, length):
+        print('Reading byte number: ', x, '\n')
+        chunk = conn.recv(1)
+        unpacked = struct.unpack('!c', chunk)[0]
+        unpacked = unpacked.decode('utf-8')
+        print('Unpacked is: ', unpacked, '\n')
+        data += unpacked
+        print('The current unpacked chunk is: ', unpacked, '\n')
+
+    print('The final unpacked chunk is: ', data, '\n')
+    return data
+
+
+def recv_two_byte_chunk(conn):
+    chunk = conn.recv(2)  # returns a bytes object
+    unpacked = struct.unpack('!h', chunk)[0]
+    return unpacked
 
 
 def current_time():
     return time.ctime(time.time())
 
 
-def do_biz_logic(data):
+def do_biz_logic(data, soc_obj):
     """
     Manipulates data and then returns a response
     :param data: a string of letters
+    :param soc_obj: client socket
     :return: a string a of letters
     """
-    return data
 
-    # Step 1: declare and initialize the response in the same form as the request
-    # first two bytes=number of answers; second two bytes=length of answer;next X bytes is the string rep of the answer
+    count_expr = data[0]
+    count_expr_packed = struct.pack('!h', count_expr)
+    print('Sending number of expressions: ', count_expr,'\n')
+    print('with byte size: ', count_expr_packed, '\n')
+    soc_obj.sendall(count_expr_packed)
 
-    # Step 2: Get the first two bytes and determine number of expressions to evaluate
+    count_expr = data[1]
+    count_expr_packed = struct.pack('!h', count_expr)
+    print('Sending length of expression: ', count_expr,'\n')
+    print('with byte size: ', count_expr_packed, '\n')
+    soc_obj.sendall(count_expr_packed)
 
-    # Step 3: Establish a location marker of current pos in the byte struct
+    expr = data[2]
+    expr = expr.encode('utf-8')
+    count_expr_packed = struct.pack('!4s', expr)
+    print('Sending expression: ', expr,'\n')
+    print('with byte size: ', count_expr_packed, '\n')
+    soc_obj.sendall(count_expr_packed)
 
 
 if __name__ == "__main":
