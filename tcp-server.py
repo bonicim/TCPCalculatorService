@@ -13,9 +13,15 @@ HOST_IP = socket.gethostbyname(HOST_NAME)
 HOST_PORT = 8888
 BACKLOG = 10
 SLEEPYTIME = 10
-TIMEOUT = 2
+MAX_EXPR_COUNT = 2
+MAX_EXPR_SIZE = 2
+CODING = 'utf-8'
 
 def main():
+    startup_server_socket()
+
+
+def startup_server_socket():
     """
     Creates client sockets. As the server socket, its only job is to create client sockets.
     The server socket does not receive and send data. That is the job of the thread handler.
@@ -47,8 +53,8 @@ def main():
                 if sock == server_socket:
                     client_socket, addr = sock.accept() # Creates CLIENT sockets
                     read_sockets.append(client_socket)
-                    print('\n', '*** NEW CONNECTION ***********************************', '\n')
-                    print('SUCCESS! Server connected to: ', addr, ' at ', current_time())
+                    print('*** NEW CONNECTION ***********************************', '\n')
+                    print('SUCCESS! Server connected to: ', addr, ' at ', current_time(), '\n')
                 else:
                     _thread.start_new_thread(handler, (sock,))
 
@@ -64,66 +70,97 @@ def handler(client_socket):
     """
     Processes a socket connection; performs simple calculations and returns results
     Does not wait for another request
-    
+
     :param client_socket: socket object
     :return: calculation for a set of numbers
     """
     # Step 1: Receive all the data
-    data = recv_data_v2(client_socket)
-    print('SUCCESS! Server received: ', data)
+    data = recv_data(client_socket)
+    print()
+    print('SUCCESS! Server received: ', data, '\n')
 
     # Step 2: Process and send the received data
     do_biz_logic(data, client_socket)
+    # send the data
 
     # Step 3: Close the client socket
     time.sleep(SLEEPYTIME)
     client_socket.close()
 
 
-def recv_data_v2(conn):
-    buf_counter = 1
+def recv_data(client_socket):
+    expr_counter = 1
     total_data = []
+    print('******** RECEIVING data **************', '\n')
 
-    count_total_expr = recv_two_byte_chunk(conn)
-    print('Received very first chunk #', buf_counter, ': ', count_total_expr,'\n')
-    total_data.append(count_total_expr)
-    print('Total data received is: ', total_data, '\n')
-    buf_counter += 1
+    # get the total number of expressions to read
+    count_expr = recv_count_expr(client_socket)
+    print('The number of expressions: ', count_expr)
+    total_data.append(count_expr)
 
-    len_expr = recv_two_byte_chunk(conn)
-    print('Received length of expr #', buf_counter, ': ', len_expr, '\n')
-    total_data.append(len_expr)
-    print('Total data received is: ', total_data, '\n')
-    buf_counter += 1
+    # start the while loop
+    while count_expr > 0:
+        # get the size of the expression
+        expr_size = recv_size_expr(client_socket)
+        print('The size of expression is: ', expr_size)
+        total_data.append(expr_size)
 
-    str_expr = recv_len_byte_chunk(conn, len_expr)
-    print('Received string expr ', buf_counter, ': ', str_expr, '\n')
-    total_data.append(str_expr)
-    print('Total data received is: ', total_data, '\n')
-    buf_counter += 1
+        # get the next expr_size bytes of the expression
+        expr_str = recv_length_expr(client_socket, expr_size)
+        print('The expression string is: ', expr_str)
+        total_data.append(expr_str)
+
+        # update expressions left to read
+        count_expr -= 1
 
     return total_data
 
 
-def recv_len_byte_chunk(conn, length):
-    data = ''
-    for x in range(0, length):
-        print('Reading byte number: ', x, '\n')
-        chunk = conn.recv(1)
-        unpacked = struct.unpack('!c', chunk)[0]
-        unpacked = unpacked.decode('utf-8')
-        print('Unpacked is: ', unpacked, '\n')
-        data += unpacked
-        print('The current unpacked chunk is: ', unpacked, '\n')
-
-    print('The final unpacked chunk is: ', data, '\n')
-    return data
+def recv_count_expr(client_socket):
+    """
+    Get the total number of expressions
+    :param client_socket:
+    :return:
+    """
+    count = client_socket.recv(MAX_EXPR_COUNT)
+    return struct.unpack('!h', count)[0]
 
 
-def recv_two_byte_chunk(conn):
-    chunk = conn.recv(2)  # returns a bytes object
-    unpacked = struct.unpack('!h', chunk)[0]
-    return unpacked
+def recv_size_expr(client_socket):
+    """
+    Get the size of the incoming expression
+    :param client_socket:
+    :return:
+    """
+    size = client_socket.recv(MAX_EXPR_SIZE)
+    return struct.unpack('!h', size)[0]
+
+def recv_length_expr(client_socket, length):
+    """
+    Read exactly length bytes from client_socket
+    Raise RuntimeError if the connection closed
+    before length bytes were read
+
+    * Note that socket is limited to read up to a max size of BUFSIZE
+    :param client_socket:
+    :param length:
+    :return: a string decoded version of the received bytes object
+    """
+    buf = b''
+    bytes_to_read = 0
+    while length > 0:
+        if length < BUFSIZE:
+            bytes_to_read = length
+        else:
+            bytes_to_read = BUFSIZE
+
+        chunk = client_socket.recv(bytes_to_read)
+        if chunk == '':
+            raise RuntimeError('unexpected connection close')
+
+        buf += chunk
+        length -= len(chunk)
+    return buf.decode('utf-8')
 
 
 def current_time():
