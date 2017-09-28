@@ -16,6 +16,7 @@ SLEEPYTIME = 3
 MAX_EXPR_COUNT = 2
 MAX_EXPR_SIZE = 2
 CODING = 'utf-8'
+ANSWR_COUNT_FMT = '!h'
 
 def main():
     startup_server_socket()
@@ -88,14 +89,15 @@ def handler(client_socket):
     :return: calculation for a set of numbers
     """
     # Step 1: Receive the full req
-    req = recv_data(client_socket)
+    req = recv_data(client_socket)  # returns an array of ints and strings
     print('REQUEST RECEIVED: ', req, '\n')
 
     # Step 2: Process and send the received data
     resp = evaluate_expr(req, client_socket)
 
     # Step 3: Send the response
-    send_response(resp, client_socket)
+    print('SENDING RESPONSE: ', resp)
+    client_socket.sendall(resp)
 
     # Step 4: Close the client socket
     client_socket.close()
@@ -177,37 +179,41 @@ def evaluate_expr(req, client_socket):
     :param client_socket: client socket
     :return: a string a of letters
     """
-
     print('*** EVALUATING EXPRESSIONS (APPROX 3 SEC) ******************')
     time.sleep(SLEEPYTIME)
-    resp = ''
+    print('Original request: ', req, '\n')
 
-    # TODO: Do business logic
+    # create an accumulator for the string message to be sent
+    resp = b''
 
-    # count_expr = req[0]
-    # count_expr_packed = struct.pack('!h', count_expr)
-    # print('Sending number of expressions: ', count_expr,'\n')
-    # print('with byte size: ', count_expr_packed, '\n')
-    # client_socket.sendall(count_expr_packed)
-    #
-    # count_expr = req[1]
-    # count_expr_packed = struct.pack('!h', count_expr)
-    # print('Sending length of expression: ', count_expr,'\n')
-    # print('with byte size: ', count_expr_packed, '\n')
-    # client_socket.sendall(count_expr_packed)
-    #
-    # expr = req[2]
-    # expr = expr.encode('utf-8')
-    # count_expr_packed = struct.pack('!4s', expr)
-    # print('Sending expression: ', expr,'\n')
-    # print('with byte size: ', count_expr_packed, '\n')
-    # client_socket.sendall(count_expr_packed)
+    # get the first input and add it to response
+    total_answers = req[0]
+    print('Number of answers is: ', total_answers, '\n')
+    resp += struct.pack(ANSWR_COUNT_FMT, total_answers)
 
+    expr_index = 1
+    while expr_index <= total_answers:
+        print('Evaluating expression #', expr_index)
+        expr_actual = req[expr_index * 2]
+        print('The actual expression is: ', expr_actual)
+        print('Doing calculation.....(approx 1 sec)')
+        time.sleep(1)
+        answer = do_math(expr_actual)  # answer must be a byte object
+        length = len(answer)
+        resp += length
+        resp += answer
+        expr_index += 1
+
+    # resp needs to be a bytes object that is really big
+    print('Generated response: ', resp)
+    print('Original request', req, '\n')
+    time.sleep(10)
     return resp
 
-def send_response(resp, client_socket):
-    # TODO: Write business logic
-    client_socket.sendall(resp)
+
+# TODO: Implement Djikstra's shunted algorithm/ parser
+def do_math(expr):
+    return expr
 
 
 if __name__ == "__main":

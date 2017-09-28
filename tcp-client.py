@@ -79,7 +79,7 @@ def get_expression_qty(msg_final=b''):
 def get_expressions_actual(msg_final):
     count = struct.unpack(EXPR_COUNT_FMT, msg_final)[0]
     while count > 0:
-        print('Working on expression #: ', count)
+        print('Gathering input on expression #: ', count)
         print('Enter the expression you want evaluated (e.g., 2+2*74/42): ')
         msg = input('==> ')
         print('You entered: ', msg, '\n')
