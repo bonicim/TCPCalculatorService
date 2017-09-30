@@ -196,9 +196,22 @@ def evaluate_expr(req, client_socket):
         print('Evaluating expression #', expr_index)
         expr_actual = req[expr_index * 2]
         print('The actual expression is: ', expr_actual)
-        print('Doing calculation.....(approx 1 sec)')
+
+        print('Doing calculation.....')
+
+        print('Converting expression into RPN.....(approx 1 sec)')
         time.sleep(1)
-        answer = do_math(expr_actual)  # answer must be a byte object
+        rpn_expr = convert_to_rpn(expr_actual)
+        print('Original expr: ', expr_actual)
+        print('RPN expr: ', rpn_expr)
+
+        print('Evaluating the expression.....(1 sec')
+        time.sleep(1)
+        answer_str = eval_rpn_expr(rpn_expr)
+        answer = convert_to_bytes(answer_str)  # answer must be a byte object
+        print('Answer: ', answer_str)
+        print('Answer in bytes: ', answer)
+
         length = len(answer)
         resp += length
         resp += answer
@@ -211,8 +224,35 @@ def evaluate_expr(req, client_socket):
     return resp
 
 
+# TODO: Implement
+def convert_to_rpn(expr):
+    """
+    Converts an infix expression (e.g. 2+2)
+    into an RPN/postfix expression (e.g  22+)
+    :param expr: string expression in infix
+    :return: stri   ng rpn expression
+    """
+    return expr
+
+
 # TODO: Implement Djikstra's shunted algorithm/ parser
-def do_math(expr):
+def eval_rpn_expr(expr):
+    """
+    Evaluates the mathematical expression. Only operations allowed
+    are +, -, *, /
+    :param expr: string expression in rpn
+    :return: string result
+    """
+    return expr
+
+
+# TODO: Implement
+def convert_to_bytes(expr):
+    """
+    Convert a string into a bytes object
+    :param expr: string
+    :return:
+    """
     return expr
 
 
