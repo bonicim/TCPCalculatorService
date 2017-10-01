@@ -235,7 +235,6 @@ def convert_to_rpn(expr):
     return expr
 
 
-# TODO: Implement Djikstra's shunted algorithm/ parser
 def eval_rpn_expr(expr):
     """
     Evaluates the mathematical expression. Only operations allowed
@@ -243,7 +242,36 @@ def eval_rpn_expr(expr):
     :param expr: string expression in rpn
     :return: string result
     """
-    return expr
+    output = []
+    length = len(expr)
+
+    for index in range(length):
+        if expr[index].isdigit():
+            output.append(expr[index])
+        else:
+            if expr[index] == '+':
+                arg1 = output.pop()
+                arg2 = output.pop()
+                res = int(arg1) + int(arg2)
+                output.append(res)
+            elif expr[index] == '*':
+                arg1 = output.pop()
+                arg2 = output.pop()
+                res = int(arg1) * int(arg2)
+                output.append(res)
+            elif expr[index] == '-':
+                arg1 = output.pop()
+                arg2 = output.pop()
+                res = int(arg2) - int(arg1)
+                output.append(res)
+            elif expr[index] == '/':
+                arg1 = output.pop()
+                arg2 = output.pop()
+                res = int(arg2) // int(arg1)
+                output.append(res)
+            else:
+                print('Illegal operator: ', expr[index])
+    return output[0]
 
 
 # TODO: Implement
