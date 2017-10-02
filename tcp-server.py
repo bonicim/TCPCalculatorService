@@ -4,7 +4,7 @@ import time
 import select
 import struct
 
-# Multithreaded TCP server that performs simple calculation
+# Multi-threaded TCP server that performs simple calculation
 
 # Constants
 BUFSIZE = 16
@@ -17,6 +17,8 @@ MAX_EXPR_COUNT = 2
 MAX_EXPR_SIZE = 2
 CODING = 'utf-8'
 ANSWR_COUNT_FMT = '!h'
+OPS_LIST = ['+', '-', '*', '/']
+
 
 def main():
     startup_server_socket()
@@ -93,7 +95,7 @@ def handler(client_socket):
     print('REQUEST RECEIVED: ', req, '\n')
 
     # Step 2: Process and send the received data
-    resp = evaluate_expr(req, client_socket)
+    resp = evaluate_expr(req)
 
     # Step 3: Send the response
     print('SENDING RESPONSE: ', resp)
@@ -172,7 +174,7 @@ def current_time():
     return time.ctime(time.time())
 
 
-def evaluate_expr(req, client_socket):
+def evaluate_expr(req):
     """
     Manipulates data and then returns a response
     :param req: a string of letters
@@ -203,28 +205,27 @@ def evaluate_expr(req, client_socket):
         time.sleep(1)
         rpn_expr = convert_to_rpn(expr_actual)
         print('Original expr: ', expr_actual)
-        print('RPN expr: ', rpn_expr)
+        print('RPN expr: ', ''.join(rpn_expr))
 
-        print('Evaluating the expression.....(1 sec')
+        print('Evaluating the expression.....(1 sec)    ')
         time.sleep(1)
         answer_str = eval_rpn_expr(rpn_expr)
         answer = convert_to_bytes(answer_str)  # answer must be a byte object
         print('Answer: ', answer_str)
-        print('Answer in bytes: ', answer)
+        print('Answer in bytes: ', answer, '\n')
 
-        length = len(answer)
-        resp += length
+        length = len(answer_str)
+        resp += struct.pack(ANSWR_COUNT_FMT,length)
         resp += answer
         expr_index += 1
 
     # resp needs to be a bytes object that is really big
     print('Generated response: ', resp)
     print('Original request', req, '\n')
-    time.sleep(10)
+    time.sleep(1)
     return resp
 
 
-# TODO: Implement
 def convert_to_rpn(expr):
     """
     Converts an infix expression (e.g. 2+2)
@@ -232,7 +233,63 @@ def convert_to_rpn(expr):
     :param expr: string expression in infix
     :return: stri   ng rpn expression
     """
-    return expr
+    length = len(expr)
+    output = []
+    ops_stack = []
+    number = ''
+
+    for index in range(length + 1):
+        if index == length:
+            output.append(number)
+        else:
+            token = expr[index]
+            if token.isdigit():
+                number += token
+            elif token in OPS_LIST:
+                output.append(number)
+                number = ''
+                if is_empty(ops_stack):
+                    ops_stack.append(token)
+                elif token == '+' or token == '-':
+                    while ~is_empty(ops_stack) or has_high_or_equal_precedence(peek(ops_stack), token):
+                        output.append(ops_stack.pop())
+                        if is_empty(ops_stack):
+                            break
+                    ops_stack.append(token)
+                elif token == '*' or token == '/':
+                    while has_high_or_equal_precedence(peek(ops_stack), token):
+                        output.append(ops_stack.pop())
+                        if is_empty(ops_stack):
+                            break
+                    ops_stack.append(token)
+
+    ops_length = len(ops_stack)
+    for i in range(ops_length):
+        output.append(ops_stack.pop())
+    return output
+
+
+def is_empty(a_list):
+    return len(a_list) == 0
+
+
+def peek(a_list):
+    val = a_list.pop()
+    a_list.append(val)
+    return val
+
+
+def has_high_or_equal_precedence(top_stack, token):
+    if token == '+':
+        return top_stack == '*' or top_stack == '/' or top_stack == token or top_stack == '-'
+    elif token == '-':
+        return top_stack == '*' or top_stack == '/' or top_stack == token or top_stack == '+'
+    elif token == '*':
+        return top_stack == token or top_stack == '/'
+    elif token == '/':
+        return top_stack == token or top_stack == '*'
+    else:
+        raise Exception("Invalid operator input. Must be +, -, *, or /.")
 
 
 def eval_rpn_expr(expr):
@@ -243,45 +300,42 @@ def eval_rpn_expr(expr):
     :return: string result
     """
     output = []
-    length = len(expr)
-
-    for index in range(length):
-        if expr[index].isdigit():
-            output.append(expr[index])
-        else:
-            if expr[index] == '+':
+    for char in expr:
+        if char.isdigit():
+            output.append(char)
+        elif char in OPS_LIST:
+            if char == '+':
                 arg1 = output.pop()
                 arg2 = output.pop()
                 res = int(arg1) + int(arg2)
                 output.append(res)
-            elif expr[index] == '*':
+            elif char == '*':
                 arg1 = output.pop()
                 arg2 = output.pop()
                 res = int(arg1) * int(arg2)
                 output.append(res)
-            elif expr[index] == '-':
+            elif char == '-':
                 arg1 = output.pop()
                 arg2 = output.pop()
-                res = int(arg2) - int(arg1)
+                res = int(arg2) - int(arg1 )
                 output.append(res)
-            elif expr[index] == '/':
+            elif char == '/':
                 arg1 = output.pop()
                 arg2 = output.pop()
                 res = int(arg2) // int(arg1)
                 output.append(res)
-            else:
-                print('Illegal operator: ', expr[index])
-    return output[0]
+        else:
+            print('Illegal operator: ', expr[index])
+    return str(output[0])
 
 
-# TODO: Implement
 def convert_to_bytes(expr):
     """
     Convert a string into a bytes object
     :param expr: string
-    :return:
+    :return: byte object equivalent of the string
     """
-    return expr
+    return expr.encode(CODING)
 
 
 if __name__ == "__main":

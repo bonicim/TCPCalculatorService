@@ -51,7 +51,6 @@ def create_client_socket():
     # Step 6: Receive response
     resp = recv_resp(client_socket)
     print('RECEIVED RESPONSE: ', resp, '\n')
-    print('ORIGINAL REQUEST: ', req_final, '\n')
 
     # Step 7: Close the socket
     print('*** CLOSING CONNECTION TO SERVER **********************', '\n')
@@ -142,7 +141,6 @@ def recv_length_expr(client_socket, length):
     :return: a string decoded version of the received bytes object
     """
     buf = b''
-    bytes_to_read = 0
     while length > 0:
         if length < BUFSIZE:
             bytes_to_read = length
